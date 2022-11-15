@@ -12,7 +12,7 @@ class OaasTask:
         self.json_dict = json_dict
         self.output_obj = json_dict['output']
         self.alloc_url = json_dict['allocOutputUrl']
-        self.output_id = json_dict['output']['id']
+        self.output_id = self.output_obj['id']
         self.main_id = json_dict['src']['id']
         self.inputs = json_dict['inputs']
         self.allocate_url_dict = None
