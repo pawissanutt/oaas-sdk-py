@@ -1,16 +1,21 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "oaas-sdk-py"
 version = "0.0.1"
 authors = [
-  { name="Pawissanutt Lertpongrujikorn", email="pawissanutt@gmail.com" },
+    { name = "Pawissanutt Lertpongrujikorn", email = "pawissanutt@gmail.com" },
 ]
 description = "SDK for developing OaaS function in Python"
 #readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
-  "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3",
+]
+
+[options]
+install_requires = [
+    'aiohttp'
 ]
