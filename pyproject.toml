@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "oaas-sdk-py"
+name = "oaas_sdk_py"
 version = "0.0.1"
 authors = [
     { name = "Pawissanutt Lertpongrujikorn", email = "pawissanutt@gmail.com" },
