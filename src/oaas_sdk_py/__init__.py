@@ -16,7 +16,7 @@ class OaasTask:
         self.output_obj = json_dict['output']
         self.alloc_url = json_dict['allocOutputUrl']
         self.output_id = self.output_obj['id']
-        self.main_id = json_dict['src']['id']
+        self.main_id = json_dict['main']['id']
         self.inputs = json_dict['inputs']
         self.main_keys = json_dict['mainKeys']
         self.input_keys = json_dict['inputKeys']
@@ -124,8 +124,7 @@ class OaasTask:
 
 
 def parse_task_from_string(json_string: str) -> OaasTask:
-    task = OaasTask(json.loads(json_string))
-    return task
+    return OaasTask(json.loads(json_string))
 
 
 def parse_task_from_dict(json_dict: dict) -> OaasTask:
