@@ -123,6 +123,10 @@ class OaasTask:
         return headers
 
 
-def parse_task(json_string) -> OaasTask:
+def parse_task_from_string(json_string: str) -> OaasTask:
     task = OaasTask(json.loads(json_string))
     return task
+
+
+def parse_task_from_dict(json_dict: dict) -> OaasTask:
+    return OaasTask(dict)
