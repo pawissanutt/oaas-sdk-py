@@ -13,10 +13,10 @@ class OaasTask:
 
     def __init__(self, json_dict):
         self.json_dict = json_dict
-        self.output_obj = json_dict['output']
-        self.alloc_url = json_dict['allocOutputUrl']
-        self.output_id = self.output_obj['id']
-        self.main_id = json_dict['src']['id']
+        self.output_obj = json_dict.get('output')
+        self.alloc_url = json_dict.get('allocOutputUrl')
+        self.output_id = self.output_obj.get('id')
+        self.main_id = json_dict['main']['id']
         self.inputs = json_dict['inputs']
         self.main_keys = json_dict['mainKeys']
         self.input_keys = json_dict['inputKeys']
@@ -91,7 +91,7 @@ class OaasTask:
             raise OaasException(f"Input index {input_index} out of range({len(self.input_keys)})")
         if key not in self.input_keys[input_index]:
             raise OaasException(f"No such key '{key}' in input object")
-        return await self.load_file(self.input_keys[input_index][key])
+        return await self.load_file(self.input_keys.get(input_index).get(key))
 
     async def load_file(self, url: str) -> StreamReader:
         async with aiohttp.ClientSession() as session:
