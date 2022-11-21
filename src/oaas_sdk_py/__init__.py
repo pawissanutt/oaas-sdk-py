@@ -1,4 +1,7 @@
+import asyncio
 import json
+from asyncio import StreamReader
+
 import aiohttp
 
 
@@ -15,6 +18,8 @@ class OaasTask:
         self.output_id = self.output_obj['id']
         self.main_id = json_dict['src']['id']
         self.inputs = json_dict['inputs']
+        self.main_keys = json_dict['mainKeys']
+        self.input_keys = json_dict['inputKeys']
         self.allocate_url_dict = None
 
     @property
@@ -29,10 +34,26 @@ class OaasTask:
             client_resp = await session.get(self.alloc_url)
             if not client_resp.ok:
                 raise OaasException("Got error when allocate keys")
-            self.allocate_url_dict = await client_resp.json()
+            resp_dict = await client_resp.json()
+            if self.allocate_url_dict is None:
+                self.allocate_url_dict = resp_dict
+            else:
+                self.allocate_url_dict = self.allocate_url_dict | resp_dict
             return self.allocate_url_dict
 
-    async def save_byte_data(self, key: str, data: bytearray) -> None:
+    async def allocate_collection(self, keys: list[str]) -> dict:
+        async with aiohttp.ClientSession() as session:
+            client_resp = await session.post(self.alloc_url, json=keys)
+            if not client_resp.ok:
+                raise OaasException("Got error when allocate keys")
+            resp_dict = await client_resp.json()
+            if self.allocate_url_dict is None:
+                self.allocate_url_dict = resp_dict
+            else:
+                self.allocate_url_dict = self.allocate_url_dict | resp_dict
+            return self.allocate_url_dict
+
+    async def upload_byte_data(self, key: str, data: bytearray) -> None:
         if self.allocate_url_dict is None:
             await self.allocate_file()
         url = self.allocate_url_dict[key]
@@ -42,6 +63,42 @@ class OaasTask:
             resp = await session.put(url, data=data)
             if not resp.ok:
                 raise OaasException("Got error when put the data to S3")
+
+    async def upload_file(self, key: str, path: str) -> None:
+        if self.allocate_url_dict is None:
+            await self.allocate_file()
+        url = self.allocate_url_dict[key]
+        if url is None:
+            raise OaasException(f"The output object not accept '{key}' as key")
+        with open(path, "rb") as f:
+            async with aiohttp.ClientSession() as session:
+                resp = await session.put(url, data=f)
+                if not resp.ok:
+                    raise OaasException("Got error when put the data to S3")
+
+    async def upload_collection(self, key_to_file: dict[str, str]) -> None:
+        await self.allocate_collection(list(key_to_file.keys()))
+        promise_list = [self.upload_file(k, v) for k, v in key_to_file]
+        await asyncio.gather(*promise_list)
+
+    async def load_main_file(self, key: str) -> StreamReader:
+        if key not in self.main_keys:
+            raise OaasException(f"NO such key '{key}' in main object")
+        return await self.load_file(self.main_keys[key])
+
+    async def load_input_file(self, input_index: int, key: str):
+        if input_index > len(self.input_keys):
+            raise OaasException(f"Input index {input_index} out of range({len(self.input_keys)})")
+        if key not in self.input_keys[input_index]:
+            raise OaasException(f"No such key '{key}' in input object")
+        return await self.load_file(self.input_keys[input_index][key])
+
+    async def load_file(self, url: str) -> StreamReader:
+        async with aiohttp.ClientSession() as session:
+            resp = await session.get(url)
+            if not resp.ok:
+                raise OaasException("Got error when get the data to S3")
+            return resp.content
 
 
 def parse_task(json_string) -> OaasTask:
