@@ -100,6 +100,28 @@ class OaasTask:
                 raise OaasException("Got error when get the data to S3")
             return resp.content
 
+    def create_completion(self,
+                          success: bool = True,
+                          error: str = None,
+                          record: dict = None,
+                          extensions: dict = None):
+        return {
+            'id': self.output_id,
+            'success': success,
+            'errorMsg': error,
+            'embeddedRecord': record,
+            'extensions': extensions
+        }
+
+    def create_reply_header(self, headers: dict = None):
+        if headers is None:
+            headers = {}
+        headers["Ce-Id"] = str(self.output_id)
+        headers["Ce-specversion"] = "1.0"
+        headers["Ce-Source"] = "oaas/" + self.output_obj["origin"]["funcName"]
+        headers["Ce-Type"] = "oaas.task.result"
+        return headers
+
 
 def parse_task(json_string) -> OaasTask:
     task = OaasTask(json.loads(json_string))
