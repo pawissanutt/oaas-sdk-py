@@ -44,10 +44,13 @@ class OaasTask:
         self.json_dict = json_dict
         self.output_obj = OaasObject(json_dict['output'])
         self.main_obj = OaasObject(json_dict['main'])
-        self.alloc_url = json_dict['allocOutputUrl']
-        self.inputs = [OaasObject(input_dict) for input_dict in json_dict['inputs']]
-        self.main_keys = json_dict['mainKeys']
-        self.input_keys = json_dict['inputKeys']
+        self.alloc_url = json_dict.get('allocOutputUrl', {})
+        if 'inputs' in json_dict:
+            self.inputs = [OaasObject(input_dict) for input_dict in json_dict['inputs']]
+        else:
+            self.inputs = []
+        self.main_keys = json_dict.get('mainKeys', {})
+        self.input_keys = json_dict.get('inputKeys', [])
         self.allocate_url_dict = None
 
     @property
