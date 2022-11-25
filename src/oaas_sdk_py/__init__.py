@@ -123,9 +123,9 @@ class OaasInvocationCtx:
         return headers
 
 
-def parse_task_from_string(json_string: str) -> OaasInvocationCtx:
+def parse_ctx_from_string(json_string: str) -> OaasInvocationCtx:
     return OaasInvocationCtx(json.loads(json_string))
 
 
-def parse_task_from_dict(json_dict: dict) -> OaasInvocationCtx:
+def parse_ctx_from_dict(json_dict: dict) -> OaasInvocationCtx:
     return OaasInvocationCtx(json_dict)
