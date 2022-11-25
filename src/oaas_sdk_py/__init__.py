@@ -4,65 +4,41 @@ from asyncio import StreamReader
 
 import aiohttp
 
+from .model import *
+
 
 class OaasException(BaseException):
     pass
 
 
-class OaasObjectOrigin:
+async def load_file(url: str) -> StreamReader:
+    async with aiohttp.ClientSession() as session:
+        resp = await session.get(url)
+        if not resp.ok:
+            raise OaasException("Got error when get the data to S3")
+        return resp.content
+
+
+class OaasInvocationCtx:
     def __init__(self, json_dict):
         self.json_dict = json_dict
-
-    @property
-    def args(self):
-        if 'args' not in self.json_dict or self.json_dict['args'] is None:
-            self.json_dict['args'] = {}
-        return self.json_dict['args']
-
-    @property
-    def func(self):
-        return self.json_dict['funcName']
-
-
-class OaasObject:
-    def __init__(self, json_dict):
-        self.json_dict = json_dict
-        self.origin = OaasObjectOrigin(self.json_dict["origin"])
-
-    @property
-    def id(self):
-        return self.json_dict["id"]
-
-    @property
-    def record(self):
-        return self.json_dict.get("embeddedRecord", {})
-
-
-class OaasTask:
-
-    def __init__(self, json_dict):
-        self.json_dict = json_dict
-        self.output_obj = OaasObject(json_dict['output'])
-        self.main_obj = OaasObject(json_dict['main'])
-        self.alloc_url = json_dict.get('allocOutputUrl', {})
-        if 'inputs' in json_dict:
-            self.inputs = [OaasObject(input_dict) for input_dict in json_dict['inputs']]
-        else:
-            self.inputs = []
-        self.main_keys = json_dict.get('mainKeys', {})
-        self.input_keys = json_dict.get('inputKeys', [])
+        self.task = OaasTask(json_dict)
         self.allocate_url_dict = None
 
     @property
     def args(self):
-        return self.output_obj.origin.args
+        return self.task.args
+
+    @property
+    def id(self):
+        return self.task.id
 
     def get_main_resource_url(self, key: str):
         return self.json_dict['mainKeys'][key]
 
     async def allocate_file(self) -> dict:
         async with aiohttp.ClientSession() as session:
-            client_resp = await session.get(self.alloc_url)
+            client_resp = await session.get(self.task.alloc_url)
             if not client_resp.ok:
                 raise OaasException("Got error when allocate keys")
             resp_dict = await client_resp.json()
@@ -74,7 +50,7 @@ class OaasTask:
 
     async def allocate_collection(self, keys: list[str]) -> dict:
         async with aiohttp.ClientSession() as session:
-            client_resp = await session.post(self.alloc_url, json=keys)
+            client_resp = await session.post(self.task.alloc_url, json=keys)
             if not client_resp.ok:
                 raise OaasException("Got error when allocate keys")
             resp_dict = await client_resp.json()
@@ -113,23 +89,16 @@ class OaasTask:
         await asyncio.gather(*promise_list)
 
     async def load_main_file(self, key: str) -> StreamReader:
-        if key not in self.main_keys:
+        if key not in self.task.main_keys:
             raise OaasException(f"NO such key '{key}' in main object")
-        return await self.load_file(self.main_keys[key])
+        return await load_file(self.task.main_keys[key])
 
     async def load_input_file(self, input_index: int, key: str):
-        if input_index > len(self.input_keys):
-            raise OaasException(f"Input index {input_index} out of range({len(self.input_keys)})")
-        if key not in self.input_keys[input_index]:
+        if input_index > len(self.task.input_keys):
+            raise OaasException(f"Input index {input_index} out of range({len(self.task.input_keys)})")
+        if key not in self.task.input_keys[input_index]:
             raise OaasException(f"No such key '{key}' in input object")
-        return await self.load_file(self.input_keys[input_index][key])
-
-    async def load_file(self, url: str) -> StreamReader:
-        async with aiohttp.ClientSession() as session:
-            resp = await session.get(url)
-            if not resp.ok:
-                raise OaasException("Got error when get the data to S3")
-            return resp.content
+        return await load_file(self.task.input_keys[input_index][key])
 
     def create_completion(self,
                           success: bool = True,
@@ -137,7 +106,7 @@ class OaasTask:
                           record: dict = None,
                           extensions: dict = None):
         return {
-            'id': self.output_obj.id,
+            'id': self.task.output_obj.id,
             'success': success,
             'errorMsg': error,
             'embeddedRecord': record,
@@ -147,9 +116,9 @@ class OaasTask:
     def create_reply_header(self, headers: dict = None):
         if headers is None:
             headers = {}
-        headers["Ce-Id"] = str(self.output_obj.id)
+        headers["Ce-Id"] = str(self.task.output_obj.id)
         headers["Ce-specversion"] = "1.0"
-        headers["Ce-Source"] = "oaas/" + self.output_obj.origin.func
+        headers["Ce-Source"] = "oaas/" + self.task.output_obj.origin.func
         headers["Ce-Type"] = "oaas.task.result"
         return headers
 
