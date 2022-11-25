@@ -84,7 +84,7 @@ class OaasInvocationCtx:
                 if not resp.ok:
                     raise OaasException("Got error when put the data to S3")
 
-    async def upload_collection(self, key_to_file: dict[str, str]) -> None:
+    async def upload_collection(self, key_to_file: Dict[str, str]) -> None:
         await self.allocate_collection(list(key_to_file.keys()))
         promise_list = [self.upload_file(k, v) for k, v in key_to_file]
         await asyncio.gather(*promise_list)
