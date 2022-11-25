@@ -1,6 +1,7 @@
 import asyncio
 import json
 from asyncio import StreamReader
+from typing import Dict, List
 
 import aiohttp
 
@@ -20,7 +21,7 @@ async def load_file(url: str) -> StreamReader:
 
 
 class OaasInvocationCtx:
-    def __init__(self, json_dict):
+    def __init__(self, json_dict: Dict):
         self.json_dict = json_dict
         self.task = OaasTask(json_dict)
         self.allocate_url_dict = None
@@ -48,7 +49,7 @@ class OaasInvocationCtx:
                 self.allocate_url_dict = self.allocate_url_dict | resp_dict
             return self.allocate_url_dict
 
-    async def allocate_collection(self, keys: list[str]) -> dict:
+    async def allocate_collection(self, keys: List[str]) -> Dict[str, str]:
         async with aiohttp.ClientSession() as session:
             client_resp = await session.post(self.task.alloc_url, json=keys)
             if not client_resp.ok:
@@ -103,8 +104,8 @@ class OaasInvocationCtx:
     def create_completion(self,
                           success: bool = True,
                           error: str = None,
-                          record: dict = None,
-                          extensions: dict = None):
+                          record: Dict = None,
+                          extensions: Dict = None):
         return {
             'id': self.task.output_obj.id,
             'success': success,
@@ -113,7 +114,7 @@ class OaasInvocationCtx:
             'extensions': extensions
         }
 
-    def create_reply_header(self, headers: dict = None):
+    def create_reply_header(self, headers=None):
         if headers is None:
             headers = {}
         headers["Ce-Id"] = str(self.task.output_obj.id)
