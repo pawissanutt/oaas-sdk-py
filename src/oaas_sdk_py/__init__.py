@@ -88,7 +88,7 @@ class OaasInvocationCtx:
             raise OaasException(f"The output object not accept '{key}' as key")
         async with aiofiles.open(path, "rb") as f:
             size = await aiofiles.os.path.getsize(path)
-            headers = {"content-length": size}
+            headers = {"content-length": str(size)}
             resp = await session.put(url, headers=headers, data=f)
             if not resp.ok:
                 raise OaasException("Got error when put the data to S3")
