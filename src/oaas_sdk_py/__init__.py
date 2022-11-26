@@ -97,7 +97,7 @@ class OaasInvocationCtx:
                                 session: ClientSession,
                                 key_to_file: Dict[str, str]) -> None:
         await self.allocate_collection(session, list(key_to_file.keys()))
-        promise_list = [self.upload_file(session, k, v) for k, v in key_to_file]
+        promise_list = [self.upload_file(session, k, v) for k, v in key_to_file.items()]
         await asyncio.gather(*promise_list)
 
     async def load_main_file(self, key: str) -> StreamReader:
