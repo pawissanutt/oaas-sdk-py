@@ -26,7 +26,11 @@ class OaasObject:
 
     @property
     def record(self):
-        return self.json_dict.get("embeddedRecord", {})
+        return self.json_dict.get("data", {})
+
+    @property
+    def data(self):
+        return self.json_dict.get("data", {})
 
 
 class OaasTask:

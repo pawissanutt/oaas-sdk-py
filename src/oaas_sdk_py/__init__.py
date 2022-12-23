@@ -115,13 +115,15 @@ class OaasInvocationCtx:
     def create_completion(self,
                           success: bool = True,
                           error: str = None,
-                          record: Dict = None,
+                          main_data: Dict = None,
+                          output_data: Dict = None,
                           extensions: Dict = None):
         return {
             'id': self.task.output_obj.id,
             'success': success,
             'errorMsg': error,
-            'embeddedRecord': record,
+            'main': {'data': main_data},
+            'output': {'data': output_data},
             'extensions': extensions
         }
 
