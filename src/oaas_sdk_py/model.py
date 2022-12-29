@@ -37,7 +37,10 @@ class OaasTask:
 
     def __init__(self, json_dict):
         self.json_dict = json_dict
-        self.output_obj = OaasObject(json_dict['output'])
+        if 'output' in json_dict:
+            self.output_obj = OaasObject(json_dict['output'])
+        else:
+            self.output_obj = None
         self.main_obj = OaasObject(json_dict['main'])
         self.alloc_url = json_dict.get('allocOutputUrl', {})
         if 'inputs' in json_dict:
