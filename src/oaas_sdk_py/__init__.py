@@ -119,7 +119,7 @@ class OaasInvocationCtx:
                           output_data: Dict = None,
                           extensions: Dict = None):
         return {
-            'id': self.task.output_obj.id,
+            'id': self.task.id,
             'success': success,
             'errorMsg': error,
             'main': {'data': main_data},
@@ -130,7 +130,7 @@ class OaasInvocationCtx:
     def create_reply_header(self, headers=None):
         if headers is None:
             headers = {}
-        headers["Ce-Id"] = str(self.task.output_obj.id)
+        headers["Ce-Id"] = str(self.task.id)
         headers["Ce-specversion"] = "1.0"
         headers["Ce-Source"] = "oaas/" + self.task.output_obj.origin.func
         headers["Ce-Type"] = "oaas.task.result"
