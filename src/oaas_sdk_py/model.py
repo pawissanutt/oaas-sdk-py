@@ -49,9 +49,10 @@ class OaasTask:
             self.inputs = []
         self.main_keys = json_dict.get('mainKeys', {})
         self.input_keys = json_dict.get('inputKeys', [])
-    @property
-    def args(self):
-        return self.output_obj.origin.args
+        if 'args' in json_dict:
+            self.args = json_dict['args']
+        else:
+            self.args = {}
 
     @property
     def id(self):
