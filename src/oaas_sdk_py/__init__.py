@@ -132,7 +132,8 @@ class OaasInvocationCtx:
             headers = {}
         headers["Ce-Id"] = str(self.task.id)
         headers["Ce-specversion"] = "1.0"
-        headers["Ce-Source"] = "oaas/" + self.task.output_obj.origin.func
+        if self.task.output_obj is not None:
+            headers["Ce-Source"] = "oaas/" + self.task.output_obj.origin.func
         headers["Ce-Type"] = "oaas.task.result"
         return headers
 
