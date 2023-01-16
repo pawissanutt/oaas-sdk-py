@@ -54,3 +54,7 @@ class OaasTask:
         else:
             self.args = {}
         self.id = self.json_dict['id']
+
+    @property
+    def func(self):
+        return self.json_dict['funcKey']
