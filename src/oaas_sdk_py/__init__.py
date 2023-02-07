@@ -1,5 +1,6 @@
 import asyncio
 import json
+from abc import abstractmethod
 from asyncio import StreamReader
 from typing import Dict, List
 import aiofiles.os
@@ -22,11 +23,31 @@ async def load_file(url: str) -> StreamReader:
         return resp.content
 
 
+async def _allocate(session: ClientSession,
+                    url):
+    client_resp = await session.get(url)
+    if not client_resp.ok:
+        raise OaasException("Got error when allocate keys")
+    return await client_resp.json()
+
+
+async def _upload(session: ClientSession,
+                   path,
+                   url):
+    async with aiofiles.open(path, "rb") as f:
+        size = await aiofiles.os.path.getsize(path)
+        headers = {"content-length": str(size)}
+        resp = await session.put(url, headers=headers, data=f)
+        if not resp.ok:
+            raise OaasException("Got error when put the data to S3")
+
+
 class OaasInvocationCtx:
     def __init__(self, json_dict: Dict):
         self.json_dict = json_dict
         self.task = OaasTask(json_dict)
         self.allocate_url_dict = None
+        self.allocate_main_url_dict = None
 
     @property
     def args(self):
@@ -41,15 +62,21 @@ class OaasInvocationCtx:
 
     async def allocate_file(self,
                             session: ClientSession) -> dict:
-        client_resp = await session.get(self.task.alloc_url)
-        if not client_resp.ok:
-            raise OaasException("Got error when allocate keys")
-        resp_dict = await client_resp.json()
+        resp_dict = await _allocate(session, self.task.alloc_url)
         if self.allocate_url_dict is None:
             self.allocate_url_dict = resp_dict
         else:
             self.allocate_url_dict = self.allocate_url_dict | resp_dict
         return self.allocate_url_dict
+
+    async def allocate_main_file(self,
+                                 session: ClientSession) -> dict:
+        resp_dict = await _allocate(session, self.task.alloc_main_url)
+        if self.allocate_main_url_dict is None:
+            self.allocate_main_url_dict = resp_dict
+        else:
+            self.allocate_main_url_dict = self.allocate_main_url_dict | resp_dict
+        return self.allocate_main_url_dict
 
     async def allocate_collection(self,
                                   session: ClientSession,
@@ -86,18 +113,27 @@ class OaasInvocationCtx:
         url = self.allocate_url_dict[key]
         if url is None:
             raise OaasException(f"The output object not accept '{key}' as key")
-        async with aiofiles.open(path, "rb") as f:
-            size = await aiofiles.os.path.getsize(path)
-            headers = {"content-length": str(size)}
-            resp = await session.put(url, headers=headers, data=f)
-            if not resp.ok:
-                raise OaasException("Got error when put the data to S3")
+        self.task.output_obj.updated_keys.append(key)
+        await _upload(session, path, url)
+
+    async def upload_main_file(self,
+                               session: ClientSession,
+                               key: str,
+                               path: str) -> None:
+        if self.allocate_main_url_dict is None:
+            await self.allocate_main_file(session)
+        url = self.allocate_main_file[key]
+        if url is None:
+            raise OaasException(f"The main object not accept '{key}' as key")
+        self.task.main_obj.updated_keys.append(key)
+        await _upload(session, path, url)
 
     async def upload_collection(self,
                                 session: ClientSession,
                                 key_to_file: Dict[str, str]) -> None:
         await self.allocate_collection(session, list(key_to_file.keys()))
         promise_list = [self.upload_file(session, k, v) for k, v in key_to_file.items()]
+        self.task.output_obj.updated_keys.extend(list(key_to_file.keys()))
         await asyncio.gather(*promise_list)
 
     async def load_main_file(self, key: str) -> StreamReader:
@@ -118,12 +154,28 @@ class OaasInvocationCtx:
                           main_data: Dict = None,
                           output_data: Dict = None,
                           extensions: Dict = None):
+        main_update = {}
+        if not self.task.immutable:
+            if main_data is None:
+                main_update["data"] = self.task.main_obj.data
+            else:
+                main_update["data"] = main_data
+            main_update["updatedKeys"] = self.task.main_obj.updated_keys
+
+        output_update = {}
+        if self.task.output_obj is not None:
+            if output_data is None:
+                output_update["data"] = self.task.main_obj.data
+            else:
+                output_update["data"] = main_data
+            output_update["updatedKeys"] = self.task.output_obj.updated_keys
+
         return {
             'id': self.task.id,
             'success': success,
             'errorMsg': error,
-            'main': {'data': main_data},
-            'output': {'data': output_data},
+            'main': main_update,
+            'output': output_update,
             'extensions': extensions
         }
 
@@ -144,3 +196,27 @@ def parse_ctx_from_string(json_string: str) -> OaasInvocationCtx:
 
 def parse_ctx_from_dict(json_dict: dict) -> OaasInvocationCtx:
     return OaasInvocationCtx(json_dict)
+
+
+class Handler:
+    @abstractmethod
+    def handle(self, ctx: OaasInvocationCtx):
+        pass
+
+
+class Router:
+    _handlers: Dict[str, Handler] = {}
+
+    def __init__(self):
+        pass
+
+    def register(self, fn_key: str, handler: Handler):
+        self._handlers[fn_key] = handler
+
+    def handle_task(self, json_task):
+        ctx = OaasInvocationCtx(json_task)
+        if ctx.task.func in self._handlers:
+            resp = self._handlers[ctx.task.func].handle(ctx)
+            return resp
+        else:
+            return None
