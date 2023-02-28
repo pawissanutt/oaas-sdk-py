@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oaas_sdk_py"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
-    { name = "Pawissanutt Lertpongrujikorn", email = "pawissanutt@gmail.com" },
+    { name = "pawissanutt", email = "pawissanutt@gmail.com" },
 ]
 description = "SDK for developing OaaS function in Python"
 #readme = "README.md"

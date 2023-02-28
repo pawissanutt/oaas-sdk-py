@@ -29,20 +29,18 @@ class OaasObject:
 
 
 class OaasTask:
+    input: [OaasObject] = []
+    output_obj: OaasObject = None
 
     def __init__(self, json_dict):
         self.json_dict = json_dict
         if 'output' in json_dict:
             self.output_obj = OaasObject(json_dict['output'])
-        else:
-            self.output_obj = None
         self.main_obj = OaasObject(json_dict['main'])
         self.alloc_url = json_dict.get('allocOutputUrl', {})
         self.alloc_main_url = json_dict.get('allocMainUrl', {})
         if 'inputs' in json_dict:
             self.inputs = [OaasObject(input_dict) for input_dict in json_dict['inputs']]
-        else:
-            self.inputs = []
         self.main_keys = json_dict.get('mainKeys', {})
         self.input_keys = json_dict.get('inputKeys', [])
         if 'args' in json_dict:

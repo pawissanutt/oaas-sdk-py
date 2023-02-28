@@ -32,8 +32,8 @@ async def _allocate(session: ClientSession,
 
 
 async def _upload(session: ClientSession,
-                   path,
-                   url):
+                  path,
+                  url):
     async with aiofiles.open(path, "rb") as f:
         size = await aiofiles.os.path.getsize(path)
         headers = {"content-length": str(size)}
@@ -43,11 +43,15 @@ async def _upload(session: ClientSession,
 
 
 class OaasInvocationCtx:
+    success: bool = True
+    error: str = None
+    extensions: dict[str, str] = None
+    allocate_url_dict = None
+    allocate_main_url_dict = None
+
     def __init__(self, json_dict: Dict):
         self.json_dict = json_dict
         self.task = OaasTask(json_dict)
-        self.allocate_url_dict = None
-        self.allocate_main_url_dict = None
 
     @property
     def args(self):
@@ -149,11 +153,8 @@ class OaasInvocationCtx:
         return await load_file(self.task.input_keys[input_index][key])
 
     def create_completion(self,
-                          success: bool = True,
-                          error: str = None,
                           main_data: Dict = None,
-                          output_data: Dict = None,
-                          extensions: Dict = None):
+                          output_data: Dict = None):
         main_update = {}
         if not self.task.immutable:
             if main_data is None:
@@ -165,18 +166,18 @@ class OaasInvocationCtx:
         output_update = {}
         if self.task.output_obj is not None:
             if output_data is None:
-                output_update["data"] = self.task.main_obj.data
+                output_update["data"] = self.task.output_obj.data
             else:
-                output_update["data"] = main_data
+                output_update["data"] = output_data
             output_update["updatedKeys"] = self.task.output_obj.updated_keys
 
         return {
             'id': self.task.id,
-            'success': success,
-            'errorMsg': error,
+            'success': self.success,
+            'errorMsg': self.error,
             'main': main_update,
             'output': output_update,
-            'extensions': extensions
+            'extensions': self.extensions
         }
 
     def create_reply_header(self, headers=None):
@@ -200,7 +201,7 @@ def parse_ctx_from_dict(json_dict: dict) -> OaasInvocationCtx:
 
 class Handler:
     @abstractmethod
-    def handle(self, ctx: OaasInvocationCtx):
+    async def handle(self, ctx: OaasInvocationCtx):
         pass
 
 
@@ -213,10 +214,11 @@ class Router:
     def register(self, fn_key: str, handler: Handler):
         self._handlers[fn_key] = handler
 
-    def handle_task(self, json_task):
+    async def handle_task(self, json_task):
         ctx = OaasInvocationCtx(json_task)
         if ctx.task.func in self._handlers:
-            resp = self._handlers[ctx.task.func].handle(ctx)
+            await self._handlers[ctx.task.func].handle(ctx)
+            resp = ctx.create_completion()
             return resp
         else:
             return None
