@@ -7,7 +7,7 @@ class OaasObjectOrigin:
     @property
     def args(self):
         if 'args' not in self.json_dict or self.json_dict['args'] is None:
-            self.json_dict['args'] = {}
+            self.json_dict['args'] = []
         return self.json_dict['args']
 
     @property

@@ -6,7 +6,7 @@ from typing import Dict, List
 import aiofiles.os
 import aiofiles
 import aiohttp
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponse
 
 from .model import *
 
@@ -15,12 +15,12 @@ class OaasException(BaseException):
     pass
 
 
-async def load_file(url: str) -> StreamReader:
+async def load_file(url: str) -> ClientResponse:
     async with aiohttp.ClientSession() as session:
         resp = await session.get(url)
         if not resp.ok:
             raise OaasException("Got error when get the data to S3")
-        return resp.content
+        return resp
 
 
 async def _allocate(session: ClientSession,
@@ -107,6 +107,21 @@ class OaasInvocationCtx:
         resp = await session.put(url, data=data)
         if not resp.ok:
             raise OaasException("Got error when put the data to S3")
+        self.task.output_obj.updated_keys.append(key)
+
+    async def upload_main_byte_data(self,
+                               session: ClientSession,
+                               key: str,
+                               data: bytearray) -> None:
+        if self.allocate_main_url_dict is None:
+            await self.allocate_main_file(session)
+        url = self.allocate_main_url_dict[key]
+        if url is None:
+            raise OaasException(f"The main object not accept '{key}' as key")
+        resp = await session.put(url, data=data)
+        if not resp.ok:
+            raise OaasException("Got error when put the data to S3")
+        self.task.main_obj.updated_keys.append(key)
 
     async def upload_file(self,
                           session: ClientSession,
@@ -140,12 +155,12 @@ class OaasInvocationCtx:
         self.task.output_obj.updated_keys.extend(list(key_to_file.keys()))
         await asyncio.gather(*promise_list)
 
-    async def load_main_file(self, key: str) -> StreamReader:
+    async def load_main_file(self, key: str) -> ClientResponse:
         if key not in self.task.main_keys:
             raise OaasException(f"NO such key '{key}' in main object")
         return await load_file(self.task.main_keys[key])
 
-    async def load_input_file(self, input_index: int, key: str):
+    async def load_input_file(self, input_index: int, key: str) -> ClientResponse:
         if input_index > len(self.task.input_keys):
             raise OaasException(f"Input index {input_index} out of range({len(self.task.input_keys)})")
         if key not in self.task.input_keys[input_index]:
