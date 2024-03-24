@@ -16,20 +16,23 @@ class OaasObjectOrigin:
 
 
 class OaasObject:
-    updated_keys: [str] = []
 
     def __init__(self, json_dict):
         self.json_dict = json_dict
-        self.origin = OaasObjectOrigin(self.json_dict["origin"])
         self.data = self.json_dict.get("data", {})
+        self.updated_keys: [str] = []
 
     @property
     def id(self):
         return self.json_dict["id"]
 
+    @property
+    def cls(self):
+        return self.json_dict["cls"]
+
 
 class OaasTask:
-    input: [OaasObject] = []
+    input: [OaasObject]
     output_obj: OaasObject = None
 
     def __init__(self, json_dict):
@@ -41,6 +44,8 @@ class OaasTask:
         self.alloc_main_url = json_dict.get('allocMainUrl', {})
         if 'inputs' in json_dict:
             self.inputs = [OaasObject(input_dict) for input_dict in json_dict['inputs']]
+        else:
+            self.inputs = []
         self.main_keys = json_dict.get('mainKeys', {})
         self.input_keys = json_dict.get('inputKeys', [])
         if 'args' in json_dict:
@@ -58,4 +63,4 @@ class OaasTask:
 
     @property
     def immutable(self) -> bool:
-        return self.json_dict["immutable"]
+        return self.json_dict.get("immutable", False)

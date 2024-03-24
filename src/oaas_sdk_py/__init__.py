@@ -1,10 +1,10 @@
 import asyncio
 import json
 from abc import abstractmethod
-from asyncio import StreamReader
-from typing import Dict, List
-import aiofiles.os
+from typing import Dict, List, Any
+
 import aiofiles
+import aiofiles.os
 import aiohttp
 from aiohttp import ClientSession, ClientResponse
 
@@ -15,31 +15,31 @@ class OaasException(BaseException):
     pass
 
 
-async def load_file(url: str) -> ClientResponse:
-    async with aiohttp.ClientSession() as session:
-        resp = await session.get(url)
-        if not resp.ok:
-            raise OaasException("Got error when get the data to S3")
-        return resp
+async def _load_file(session: ClientSession,
+                     url: str) -> ClientResponse:
+    resp = await session.get(url)
+    if not resp.ok:
+        raise OaasException(f"Got error when get the data from S3 (code:{resp.status})")
+    return resp
 
 
 async def _allocate(session: ClientSession,
                     url):
-    client_resp = await session.get(url)
-    if not client_resp.ok:
-        raise OaasException("Got error when allocate keys")
-    return await client_resp.json()
+    resp = await session.get(url)
+    if not resp.ok:
+        raise OaasException(f"Got error when allocate keys (code:{resp.status})")
+    return await resp.json()
 
 
 async def _upload(session: ClientSession,
                   path,
                   url):
-    async with aiofiles.open(path, "rb") as f:
-        size = await aiofiles.os.path.getsize(path)
+    size = await aiofiles.os.path.getsize(path)
+    with open(path, "rb") as f:
         headers = {"content-length": str(size)}
         resp = await session.put(url, headers=headers, data=f)
         if not resp.ok:
-            raise OaasException("Got error when put the data to S3")
+            raise OaasException(f"Got error when put the data to S3 (code:{resp.status})")
 
 
 class OaasInvocationCtx:
@@ -48,6 +48,7 @@ class OaasInvocationCtx:
     extensions: dict[str, str] = None
     allocate_url_dict = None
     allocate_main_url_dict = None
+    resp_body: dict[str, Any] = None
 
     def __init__(self, json_dict: Dict):
         self.json_dict = json_dict
@@ -98,7 +99,7 @@ class OaasInvocationCtx:
     async def upload_byte_data(self,
                                session: ClientSession,
                                key: str,
-                               data: bytearray) -> None:
+                               data: bytes) -> None:
         if self.allocate_url_dict is None:
             await self.allocate_file(session)
         url = self.allocate_url_dict[key]
@@ -110,9 +111,9 @@ class OaasInvocationCtx:
         self.task.output_obj.updated_keys.append(key)
 
     async def upload_main_byte_data(self,
-                               session: ClientSession,
-                               key: str,
-                               data: bytearray) -> None:
+                                    session: ClientSession,
+                                    key: str,
+                                    data: bytes) -> None:
         if self.allocate_main_url_dict is None:
             await self.allocate_main_file(session)
         url = self.allocate_main_url_dict[key]
@@ -155,17 +156,17 @@ class OaasInvocationCtx:
         self.task.output_obj.updated_keys.extend(list(key_to_file.keys()))
         await asyncio.gather(*promise_list)
 
-    async def load_main_file(self, key: str) -> ClientResponse:
+    async def load_main_file(self, session: ClientSession, key: str) -> ClientResponse:
         if key not in self.task.main_keys:
             raise OaasException(f"NO such key '{key}' in main object")
-        return await load_file(self.task.main_keys[key])
+        return await _load_file(session, self.task.main_keys[key])
 
-    async def load_input_file(self, input_index: int, key: str) -> ClientResponse:
+    async def load_input_file(self, session: ClientSession, input_index: int, key: str) -> ClientResponse:
         if input_index > len(self.task.input_keys):
             raise OaasException(f"Input index {input_index} out of range({len(self.task.input_keys)})")
         if key not in self.task.input_keys[input_index]:
             raise OaasException(f"No such key '{key}' in input object")
-        return await load_file(self.task.input_keys[input_index][key])
+        return await _load_file(session, self.task.input_keys[input_index][key])
 
     def create_completion(self,
                           main_data: Dict = None,
@@ -192,7 +193,8 @@ class OaasInvocationCtx:
             'errorMsg': self.error,
             'main': main_update,
             'output': output_update,
-            'extensions': self.extensions
+            'extensions': self.extensions,
+            'body': self.resp_body
         }
 
     def create_reply_header(self, headers=None):
@@ -221,10 +223,14 @@ class Handler:
 
 
 class Router:
+    _default_handler: Handler = None
     _handlers: Dict[str, Handler] = {}
 
     def __init__(self):
         pass
+
+    def register(self, handler: Handler):
+        self._default_handler = handler
 
     def register(self, fn_key: str, handler: Handler):
         self._handlers[fn_key] = handler
@@ -233,6 +239,10 @@ class Router:
         ctx = OaasInvocationCtx(json_task)
         if ctx.task.func in self._handlers:
             await self._handlers[ctx.task.func].handle(ctx)
+            resp = ctx.create_completion()
+            return resp
+        elif self._default_handler is not None:
+            await self._default_handler.handle(ctx)
             resp = ctx.create_completion()
             return resp
         else:

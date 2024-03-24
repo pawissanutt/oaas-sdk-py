@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oaas_sdk_py"
-version = "0.1.4"
+version = "0.2.2"
 authors = [
     { name = "pawissanutt", email = "pawissanutt@gmail.com" },
 ]
@@ -15,8 +15,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    'aiohttp >= 3.8.3',
-    'aiofiles >= 22.1.0'
+    'aiohttp >= 3.8.5',
+    'aiofiles >= 23.2.1'
 ]
 
 #[options]
