@@ -1,6 +1,6 @@
 build:
-    rm dist/*
+    rm -f dist/*
     python -m build
 
 upload:
-    python -m twine upload .\dist\*
+    python -m twine upload dist/*

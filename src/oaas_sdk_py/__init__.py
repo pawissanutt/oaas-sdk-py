@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from abc import abstractmethod
 from typing import Dict, List, Any
 
@@ -67,6 +68,7 @@ class OaasInvocationCtx:
 
     async def allocate_file(self,
                             session: ClientSession) -> dict:
+        logging.debug(f"allocate_file for '{self.task.output_obj.id}'")
         resp_dict = await _allocate(session, self.task.alloc_url)
         if self.allocate_url_dict is None:
             self.allocate_url_dict = resp_dict
@@ -76,6 +78,7 @@ class OaasInvocationCtx:
 
     async def allocate_main_file(self,
                                  session: ClientSession) -> dict:
+        logging.debug(f"allocate_file for '{self.task.main_obj.id}'")
         resp_dict = await _allocate(session, self.task.alloc_main_url)
         if self.allocate_main_url_dict is None:
             self.allocate_main_url_dict = resp_dict
@@ -100,9 +103,13 @@ class OaasInvocationCtx:
                                session: ClientSession,
                                key: str,
                                data: bytes) -> None:
-        if self.allocate_url_dict is None:
+        if key in self.task.output_keys:
+            url = self.task.output_keys[key]
+        elif self.allocate_url_dict is None:
             await self.allocate_file(session)
-        url = self.allocate_url_dict[key]
+            url = self.allocate_url_dict[key]
+        else:
+            url = self.allocate_url_dict[key]
         if url is None:
             raise OaasException(f"The output object not accept '{key}' as key")
         resp = await session.put(url, data=data)
@@ -116,7 +123,9 @@ class OaasInvocationCtx:
                                     data: bytes) -> None:
         if self.allocate_main_url_dict is None:
             await self.allocate_main_file(session)
-        url = self.allocate_main_url_dict[key]
+            url = self.allocate_main_url_dict[key]
+        else:
+            url = self.allocate_url_dict[key]
         if url is None:
             raise OaasException(f"The main object not accept '{key}' as key")
         resp = await session.put(url, data=data)
@@ -128,9 +137,13 @@ class OaasInvocationCtx:
                           session: ClientSession,
                           key: str,
                           path: str) -> None:
-        if self.allocate_url_dict is None:
+        if key in self.task.output_keys:
+            url = self.task.output_keys[key]
+        elif self.allocate_url_dict is None:
             await self.allocate_file(session)
-        url = self.allocate_url_dict[key]
+            url = self.allocate_url_dict[key]
+        else:
+            url = self.allocate_url_dict[key]
         if url is None:
             raise OaasException(f"The output object not accept '{key}' as key")
         self.task.output_obj.updated_keys.append(key)
@@ -229,11 +242,11 @@ class Router:
     def __init__(self):
         pass
 
-    def register(self, handler: Handler):
-        self._default_handler = handler
-
-    def register(self, fn_key: str, handler: Handler):
-        self._handlers[fn_key] = handler
+    def register(self, handler: Handler, fn_key: str = None):
+        if fn_key is None:
+            self._default_handler = handler
+        else:
+            self._handlers[fn_key] = handler
 
     async def handle_task(self, json_task):
         ctx = OaasInvocationCtx(json_task)

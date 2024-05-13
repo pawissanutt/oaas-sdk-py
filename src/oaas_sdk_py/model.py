@@ -47,6 +47,7 @@ class OaasTask:
         else:
             self.inputs = []
         self.main_keys = json_dict.get('mainKeys', {})
+        self.output_keys = json_dict.get('outputKeys', {})
         self.input_keys = json_dict.get('inputKeys', [])
         if 'args' in json_dict:
             self.args = json_dict['args']
