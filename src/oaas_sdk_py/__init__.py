@@ -48,7 +48,6 @@ class OaasInvocationCtx:
     error: str = None
     extensions: dict[str, str] = None
     allocate_url_dict = None
-    allocate_main_url_dict = None
     resp_body: dict[str, Any] = None
 
     def __init__(self, json_dict: Dict):
@@ -80,11 +79,8 @@ class OaasInvocationCtx:
                                  session: ClientSession) -> dict:
         logging.debug(f"allocate_file for '{self.task.main_obj.id}'")
         resp_dict = await _allocate(session, self.task.alloc_main_url)
-        if self.allocate_main_url_dict is None:
-            self.allocate_main_url_dict = resp_dict
-        else:
-            self.allocate_main_url_dict = self.allocate_main_url_dict | resp_dict
-        return self.allocate_main_url_dict
+        self.task.main_put_keys = self.task.main_put_keys | resp_dict
+        return self.task.main_put_keys
 
     async def allocate_collection(self,
                                   session: ClientSession,
@@ -121,11 +117,7 @@ class OaasInvocationCtx:
                                     session: ClientSession,
                                     key: str,
                                     data: bytes) -> None:
-        if self.allocate_main_url_dict is None:
-            await self.allocate_main_file(session)
-            url = self.allocate_main_url_dict[key]
-        else:
-            url = self.allocate_url_dict[key]
+        url = self.task.main_put_keys[key]
         if url is None:
             raise OaasException(f"The main object not accept '{key}' as key")
         resp = await session.put(url, data=data)
@@ -153,9 +145,7 @@ class OaasInvocationCtx:
                                session: ClientSession,
                                key: str,
                                path: str) -> None:
-        if self.allocate_main_url_dict is None:
-            await self.allocate_main_file(session)
-        url = self.allocate_main_file[key]
+        url = self.task.main_put_keys[key]
         if url is None:
             raise OaasException(f"The main object not accept '{key}' as key")
         self.task.main_obj.updated_keys.append(key)
@@ -170,9 +160,9 @@ class OaasInvocationCtx:
         await asyncio.gather(*promise_list)
 
     async def load_main_file(self, session: ClientSession, key: str) -> ClientResponse:
-        if key not in self.task.main_keys:
+        if key not in self.task.main_get_keys:
             raise OaasException(f"NO such key '{key}' in main object")
-        return await _load_file(session, self.task.main_keys[key])
+        return await _load_file(session, self.task.main_get_keys[key])
 
     async def load_input_file(self, session: ClientSession, input_index: int, key: str) -> ClientResponse:
         if input_index > len(self.task.input_keys):

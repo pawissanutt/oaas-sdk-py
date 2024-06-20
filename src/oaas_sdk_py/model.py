@@ -20,15 +20,27 @@ class OaasObject:
     def __init__(self, json_dict):
         self.json_dict = json_dict
         self.data = self.json_dict.get("data", {})
+        if self.data is None:
+            self.data = {}
         self.updated_keys: [str] = []
+        self.meta = Metadata(self.json_dict.get("_meta", {}))
 
     @property
     def id(self):
-        return self.json_dict["id"]
+        return self.meta.id
 
     @property
     def cls(self):
-        return self.json_dict["cls"]
+        return self.meta.cls
+
+
+class Metadata:
+    def __init__(self, json_dict):
+        self.json_dict = json_dict
+        self.id = self.json_dict.get("id")
+        self.cls = self.json_dict.get("cls")
+        self.ver_ids = self.json_dict.get("verIds")
+        self.refs = self.json_dict.get("refs")
 
 
 class OaasTask:
@@ -46,7 +58,8 @@ class OaasTask:
             self.inputs = [OaasObject(input_dict) for input_dict in json_dict['inputs']]
         else:
             self.inputs = []
-        self.main_keys = json_dict.get('mainKeys', {})
+        self.main_get_keys = json_dict.get('mainGetKeys', {})
+        self.main_put_keys = json_dict.get('mainPutKeys', {})
         self.output_keys = json_dict.get('outputKeys', {})
         self.input_keys = json_dict.get('inputKeys', [])
         if 'args' in json_dict:

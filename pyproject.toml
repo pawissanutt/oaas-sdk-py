@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oaas_sdk_py"
-version = "0.2.5"
+version = "0.3.2"
 authors = [
     { name = "pawissanutt", email = "pawissanutt@gmail.com" },
 ]
