@@ -1,3 +1,5 @@
 # OaaS SDK for Python
 
+NOTE: This project is archived for the new version for https://github.com/hpcclab/oaas-sdk2-py[oaas-sdk2-py]
+
 Check the guide on the OaaS repo: https://github.com/hpcclab/OaaS/blob/main/doc/FUNCTION_GUIDE.adoc[link]
